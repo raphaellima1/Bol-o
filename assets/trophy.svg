@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Taca">
+  <rect width="128" height="128" rx="24" fill="#176d4a"/>
+  <path d="M38 28h52v14c0 25-10 40-26 44C48 82 38 67 38 42V28Z" fill="#f5c542"/>
+  <path d="M37 39H20c1 22 10 36 27 42l4-12c-11-4-17-13-19-20h5V39Zm54 0h17c-1 22-10 36-27 42l-4-12c11-4 17-13 19-20h-5V39Z" fill="#f5c542"/>
+  <path d="M56 84h16v16h18v12H38v-12h18V84Z" fill="#f5c542"/>
+  <path d="M50 42h28v9H50v-9Zm0 17h28v9H50v-9Z" fill="#176d4a" opacity=".38"/>
+</svg>

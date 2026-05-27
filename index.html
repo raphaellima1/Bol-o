@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Painel do Bolao da Copa</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="authView" class="auth-shell">
+      <section class="auth-card" aria-labelledby="authTitle">
+        <div class="brand-lockup">
+          <img src="./assets/trophy.svg" alt="" class="brand-mark" />
+          <div>
+            <p class="eyebrow">Bolao da Copa</p>
+            <h1 id="authTitle">Entre no painel</h1>
+          </div>
+        </div>
+
+        <div class="mode-switch" role="tablist" aria-label="Modo de acesso">
+          <button id="loginModeBtn" class="is-active" type="button">Login</button>
+          <button id="signupModeBtn" type="button">Cadastro</button>
+        </div>
+
+        <form id="authForm" class="auth-form">
+          <label>
+            Nome
+            <input id="nameInput" name="name" type="text" autocomplete="name" placeholder="Seu nome" />
+          </label>
+          <label>
+            E-mail
+            <input id="emailInput" name="email" type="email" autocomplete="email" placeholder="voce@email.com" required />
+          </label>
+          <label>
+            Senha
+            <input id="passwordInput" name="password" type="password" autocomplete="current-password" placeholder="Minimo 4 caracteres" required />
+          </label>
+          <p id="authMessage" class="form-message" aria-live="polite"></p>
+          <button class="primary-action" type="submit">
+            <span id="authSubmitLabel">Entrar</span>
+          </button>
+        </form>
+      </section>
+    </main>
+
+    <main id="appView" class="app-shell is-hidden">
+      <aside class="sidebar">
+        <div class="brand-lockup compact">
+          <img src="./assets/trophy.svg" alt="" class="brand-mark" />
+          <div>
+            <p class="eyebrow">Bolao</p>
+            <strong>Copa do Mundo</strong>
+          </div>
+        </div>
+
+        <nav class="tabs" aria-label="Navegacao principal">
+          <button class="tab-button is-active" data-tab="predictions" type="button" onclick="switchTab('predictions')">
+            <span class="tab-icon">✎</span>
+            Simulacao
+          </button>
+          <button class="tab-button" data-tab="ranking" type="button" onclick="switchTab('ranking')">
+            <span class="tab-icon">▦</span>
+            Resultado e ranking
+          </button>
+          <button id="settingsMenuBtn" class="tab-button" data-tab="settings" type="button" onclick="switchTab('settings')">
+            <span class="tab-icon">⚙</span>
+            Configuracoes
+          </button>
+        </nav>
+
+        <div class="session-card">
+          <span id="currentUserRole">Participante</span>
+          <strong id="currentUserName">-</strong>
+          <button id="logoutBtn" class="ghost-action" type="button" onclick="handleLogout()">Sair</button>
+        </div>
+      </aside>
+
+      <section class="content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Primeira fase</p>
+            <h2 id="pageTitle">Simulacao dos palpites</h2>
+          </div>
+          <div class="score-pill">
+            <span>Pontos atuais</span>
+            <strong id="currentScore">0</strong>
+          </div>
+        </header>
+
+        <section id="predictionsTab" class="tab-panel">
+          <div class="panel-intro">
+            <div>
+              <h3>Palpites da fase de grupos</h3>
+              <p>Preencha os placares e salve sua simulacao. A classificacao do grupo muda automaticamente.</p>
+            </div>
+            <button id="savePredictionsBtn" class="primary-action" type="button" onclick="savePredictions()">Salvar palpites</button>
+          </div>
+          <div id="predictionGroups" class="group-grid"></div>
+        </section>
+
+        <section id="rankingTab" class="tab-panel is-hidden">
+          <div class="ranking-layout">
+            <section class="ranking-card">
+              <h3>Classificacao do bolao</h3>
+              <div id="rankingList" class="ranking-list"></div>
+            </section>
+            <section class="ranking-card">
+              <h3>Classificacao por grupo</h3>
+              <div id="officialStandings" class="standings-stack"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="settingsTab" class="tab-panel is-hidden">
+          <div class="split-layout">
+            <section>
+              <div class="panel-intro">
+                <div>
+                  <h3>Resultados oficiais</h3>
+                  <p>Area do administrador para atualizar os placares reais e recalcular o bolao.</p>
+                </div>
+                <button id="saveOfficialBtn" class="primary-action" type="button" onclick="saveOfficialResults()">Salvar resultados</button>
+              </div>
+              <div id="officialGroups" class="official-stack"></div>
+            </section>
+
+            <aside class="ranking-column">
+              <section class="ranking-card">
+                <h3>Participantes</h3>
+                <div id="participantsList" class="participants-list"></div>
+              </section>
+            </aside>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
