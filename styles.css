@@ -501,7 +501,45 @@ input:focus {
   min-width: 0;
 }
 
-.participant-item span {
+.participant-item span,
+.participant-item small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-list,
+.history-section {
+  display: grid;
+  gap: 10px;
+}
+
+.history-section + .history-section {
+  margin-top: 14px;
+}
+
+.history-section h4 {
+  margin: 0;
+  color: var(--green-dark);
+  font-size: 0.86rem;
+  text-transform: uppercase;
+}
+
+.user-info-item,
+.history-item {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+}
+
+.user-info-item span,
+.history-item span,
+.history-item small {
   overflow: hidden;
   color: var(--muted);
   font-size: 0.84rem;

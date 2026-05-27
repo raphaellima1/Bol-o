@@ -1,4 +1,7 @@
 const STORAGE_KEY = "bolaoCopaApp";
+const ADMIN_EMAIL = "raphaeel.rmdl@gmail.com";
+const ADMIN_PASSWORD = "1991";
+const ADMIN_NAME = "Raphael Lima";
 
 const team = (name, code) => ({ name, code });
 
@@ -63,6 +66,7 @@ const officialGroups = document.querySelector("#officialGroups");
 const officialStandings = document.querySelector("#officialStandings");
 const rankingList = document.querySelector("#rankingList");
 const participantsList = document.querySelector("#participantsList");
+const userHistoryList = document.querySelector("#userHistoryList");
 const settingsMenuBtn = document.querySelector("#settingsMenuBtn");
 
 function loadState() {
@@ -76,6 +80,7 @@ function loadState() {
     users: [],
     predictions: {},
     officialResults: {},
+    history: [],
   });
 }
 
@@ -83,14 +88,42 @@ function migrateState(nextState) {
   nextState.users = nextState.users || [];
   nextState.predictions = nextState.predictions || {};
   nextState.officialResults = nextState.officialResults || {};
-  const hasRoles = nextState.users.every((user) => user.role);
-  if (!hasRoles) {
-    nextState.users = nextState.users.map((user, index) => ({
-      ...user,
-      role: user.role || (index === 0 ? "admin" : "participant"),
-    }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+  nextState.history = nextState.history || [];
+
+  const existingAdmin = nextState.users.find((user) => normalizeEmail(user.email || "") === ADMIN_EMAIL);
+  if (existingAdmin) {
+    existingAdmin.name = existingAdmin.name || ADMIN_NAME;
+    existingAdmin.email = ADMIN_EMAIL;
+    existingAdmin.password = ADMIN_PASSWORD;
+    existingAdmin.role = "admin";
+  } else {
+    const admin = {
+      id: "admin-raphael",
+      name: ADMIN_NAME,
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+      role: "admin",
+      createdAt: new Date().toISOString(),
+      passwordHistory: [{ password: ADMIN_PASSWORD, changedAt: new Date().toISOString(), reason: "Administrador pre-configurado" }],
+    };
+    nextState.users.unshift(admin);
+    nextState.predictions[admin.id] = nextState.predictions[admin.id] || {};
   }
+
+  nextState.users = nextState.users.map((user) => {
+    const email = normalizeEmail(user.email || "");
+    const isPresetAdmin = email === ADMIN_EMAIL;
+    return {
+      ...user,
+      email,
+      role: isPresetAdmin ? "admin" : "participant",
+      createdAt: user.createdAt || new Date().toISOString(),
+      passwordHistory: user.passwordHistory || [{ password: user.password || "", changedAt: new Date().toISOString(), reason: "Senha inicial" }],
+      lastLoginAt: user.lastLoginAt || "",
+    };
+  });
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
   return nextState;
 }
 
@@ -140,10 +173,21 @@ function handleAuth(event) {
       authMessage.textContent = "Este e-mail ja esta cadastrado.";
       return;
     }
-    const user = { id: crypto.randomUUID(), name, email, password, role: state.users.length === 0 ? "admin" : "participant" };
+    const user = {
+      id: crypto.randomUUID(),
+      name,
+      email,
+      password,
+      role: "participant",
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+      passwordHistory: [{ password, changedAt: new Date().toISOString(), reason: "Cadastro do participante" }],
+    };
     state.users.push(user);
     state.currentUserId = user.id;
     state.predictions[user.id] = {};
+    recordHistory("Cadastro", user, "Participante cadastrado");
+    recordHistory("Login", user, "Primeiro acesso apos cadastro");
     saveState();
     renderApp();
     return;
@@ -155,8 +199,25 @@ function handleAuth(event) {
     return;
   }
   state.currentUserId = user.id;
+  user.lastLoginAt = new Date().toISOString();
+  recordHistory("Login", user, "Acesso realizado");
   saveState();
   renderApp();
+}
+
+function recordHistory(type, user, detail) {
+  state.history = state.history || [];
+  state.history.unshift({
+    id: crypto.randomUUID(),
+    type,
+    detail,
+    userId: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    createdAt: new Date().toISOString(),
+  });
+  state.history = state.history.slice(0, 100);
 }
 
 function readScoreInputs(scope, prefix) {
@@ -197,6 +258,7 @@ function deleteParticipant(userId) {
   if (!target || target.role === "admin") return;
   state.users = state.users.filter((user) => user.id !== userId);
   delete state.predictions[userId];
+  recordHistory("Exclusao", target, "Participante excluido pelo administrador");
   saveState();
   renderApp();
 }
@@ -406,12 +468,62 @@ function renderParticipants() {
           <div>
             <strong>${user.name}</strong>
             <span>${user.email}</span>
+            <small>Senha: ${user.password} · Cadastro: ${formatDate(user.createdAt)}</small>
           </div>
           <button class="danger-action" type="button" data-delete-user="${user.id}" onclick="deleteParticipant('${user.id}')">Excluir</button>
         </div>
       `,
     )
     .join("");
+}
+
+function renderUserHistory() {
+  const usersMarkup = state.users
+    .map(
+      (user) => `
+        <div class="user-info-item">
+          <strong>${user.name}</strong>
+          <span>${user.email}</span>
+          <span>Perfil: ${user.role === "admin" ? "Administrador" : "Participante"}</span>
+          <span>Senha atual: ${user.password}</span>
+          <span>Ultimo login: ${formatDate(user.lastLoginAt)}</span>
+        </div>
+      `,
+    )
+    .join("");
+
+  const historyMarkup = (state.history || [])
+    .slice(0, 20)
+    .map(
+      (item) => `
+        <div class="history-item">
+          <strong>${item.type}</strong>
+          <span>${item.name} · ${item.email}</span>
+          <span>${item.detail}</span>
+          <small>${formatDate(item.createdAt)}</small>
+        </div>
+      `,
+    )
+    .join("");
+
+  userHistoryList.innerHTML = `
+    <div class="history-section">
+      <h4>Usuarios no banco local</h4>
+      ${usersMarkup || `<div class="empty-state">Nenhum usuario salvo.</div>`}
+    </div>
+    <div class="history-section">
+      <h4>Historico de login e senha</h4>
+      ${historyMarkup || `<div class="empty-state">Nenhum historico registrado ainda.</div>`}
+    </div>
+  `;
+}
+
+function formatDate(value) {
+  if (!value) return "Sem registro";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function renderRanking() {
@@ -457,6 +569,7 @@ function renderApp() {
   renderPredictionGroups();
   renderOfficialGroups();
   renderParticipants();
+  renderUserHistory();
   renderRanking();
   if (isAdmin(user)) {
     activeTab = "settings";
@@ -504,6 +617,12 @@ document.querySelector("#logoutBtn").addEventListener("click", handleLogout);
 document.querySelectorAll(".tab-button").forEach((button) => {
   button.addEventListener("click", () => switchTab(button.dataset.tab));
 });
+
+window.switchTab = switchTab;
+window.savePredictions = savePredictions;
+window.saveOfficialResults = saveOfficialResults;
+window.deleteParticipant = deleteParticipant;
+window.handleLogout = handleLogout;
 
 setAuthMode("login");
 renderApp();
