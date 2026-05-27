@@ -119,7 +119,10 @@
                   <h3>Resultados oficiais</h3>
                   <p>Area do administrador para atualizar os placares reais e recalcular o bolao.</p>
                 </div>
-                <button id="saveOfficialBtn" class="primary-action" type="button" onclick="saveOfficialResults()">Salvar resultados</button>
+                <div class="action-row">
+                  <button id="syncDatabaseBtn" class="ghost-action" type="button" onclick="syncDatabase()">Atualizar banco</button>
+                  <button id="saveOfficialBtn" class="primary-action" type="button" onclick="saveOfficialResults()">Salvar resultados</button>
+                </div>
               </div>
               <div id="officialGroups" class="official-stack"></div>
             </section>
@@ -139,6 +142,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=3"></script>
+    <script src="./app.js?v=4"></script>
   </body>
 </html>

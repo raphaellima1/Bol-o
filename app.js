@@ -49,6 +49,7 @@ let state = loadState();
 let mode = "login";
 let activeTab = "predictions";
 let databaseReady = false;
+let syncInProgress = false;
 
 const authView = document.querySelector("#authView");
 const appView = document.querySelector("#appView");
@@ -180,6 +181,8 @@ function toDbUser(user) {
 }
 
 async function loadRemoteState() {
+  const currentUser = getCurrentUser();
+  const currentEmail = currentUser ? normalizeEmail(currentUser.email) : "";
   const [usersRows, predictionRows, officialRows, historyRows] = await Promise.all([
     supabaseRequest("bolao_users?select=*&order=created_at.asc"),
     supabaseRequest("bolao_predictions?select=*"),
@@ -187,7 +190,6 @@ async function loadRemoteState() {
     supabaseRequest("bolao_history?select=*&order=created_at.desc&limit=100"),
   ]);
 
-  const currentUserId = state.currentUserId;
   state.users = usersRows.map(toAppUser);
   state.predictions = Object.fromEntries(predictionRows.map((row) => [row.user_id, row.predictions || {}]));
   state.officialResults = officialRows.find((row) => row.id === "official")?.results || {};
@@ -201,10 +203,26 @@ async function loadRemoteState() {
     role: row.role,
     createdAt: row.created_at,
   }));
-  state.currentUserId = state.users.some((user) => user.id === currentUserId) ? currentUserId : null;
+  if (currentEmail) {
+    state.currentUserId = state.users.find((user) => normalizeEmail(user.email) === currentEmail)?.id || null;
+  }
   state = migrateState(state);
   databaseReady = true;
   saveState();
+}
+
+async function syncDatabase() {
+  if (syncInProgress) return;
+  syncInProgress = true;
+  try {
+    await ensureRemoteSeed();
+    await loadRemoteState();
+    renderApp();
+  } catch (error) {
+    showDatabaseError(error);
+  } finally {
+    syncInProgress = false;
+  }
 }
 
 async function ensureRemoteSeed() {
@@ -753,6 +771,9 @@ function switchTab(tabName) {
     settings: "Configuracoes",
   };
   pageTitle.textContent = titles[tabName];
+  if (tabName === "settings" && databaseReady) {
+    syncDatabase();
+  }
 }
 
 loginModeBtn.addEventListener("click", () => setAuthMode("login"));
@@ -773,16 +794,11 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 async function initializeApp() {
   setAuthMode("login");
   renderApp();
-  try {
-    await ensureRemoteSeed();
-    await loadRemoteState();
-    renderApp();
-  } catch (error) {
-    showDatabaseError(error);
-  }
+  await syncDatabase();
 }
 
 window.switchTab = switchTab;
+window.syncDatabase = syncDatabase;
 window.savePredictions = savePredictions;
 window.saveOfficialResults = saveOfficialResults;
 window.deleteParticipant = deleteParticipant;
