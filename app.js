@@ -1,4 +1,6 @@
 const STORAGE_KEY = "bolaoCopaApp";
+const SUPABASE_URL = "https://mrzyyofibvkslsphljvu.supabase.co";
+const SUPABASE_KEY = "sb_publishable_wuq8QTeVxvMy0G5MbZKkyA_qhPBZH3x";
 const ADMIN_EMAIL = "raphaeel.rmdl@gmail.com";
 const ADMIN_PASSWORD = "1991";
 const ADMIN_NAME = "Raphael Lima";
@@ -46,6 +48,7 @@ const matches = groups.flatMap((group) => {
 let state = loadState();
 let mode = "login";
 let activeTab = "predictions";
+let databaseReady = false;
 
 const authView = document.querySelector("#authView");
 const appView = document.querySelector("#appView");
@@ -131,6 +134,140 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+async function supabaseRequest(path, options = {}) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation,resolution=merge-duplicates",
+      ...(options.headers || {}),
+    },
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || `Erro Supabase ${response.status}`);
+  }
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+function toAppUser(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: normalizeEmail(row.email),
+    password: row.password,
+    role: row.role,
+    createdAt: row.created_at,
+    lastLoginAt: row.last_login_at || "",
+    passwordHistory: row.password_history || [],
+  };
+}
+
+function toDbUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: normalizeEmail(user.email),
+    password: user.password,
+    role: user.role,
+    created_at: user.createdAt || new Date().toISOString(),
+    last_login_at: user.lastLoginAt || null,
+    password_history: user.passwordHistory || [],
+  };
+}
+
+async function loadRemoteState() {
+  const [usersRows, predictionRows, officialRows, historyRows] = await Promise.all([
+    supabaseRequest("bolao_users?select=*&order=created_at.asc"),
+    supabaseRequest("bolao_predictions?select=*"),
+    supabaseRequest("bolao_official_results?select=*"),
+    supabaseRequest("bolao_history?select=*&order=created_at.desc&limit=100"),
+  ]);
+
+  const currentUserId = state.currentUserId;
+  state.users = usersRows.map(toAppUser);
+  state.predictions = Object.fromEntries(predictionRows.map((row) => [row.user_id, row.predictions || {}]));
+  state.officialResults = officialRows.find((row) => row.id === "official")?.results || {};
+  state.history = historyRows.map((row) => ({
+    id: row.id,
+    type: row.type,
+    detail: row.detail,
+    userId: row.user_id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    createdAt: row.created_at,
+  }));
+  state.currentUserId = state.users.some((user) => user.id === currentUserId) ? currentUserId : null;
+  state = migrateState(state);
+  databaseReady = true;
+  saveState();
+}
+
+async function ensureRemoteSeed() {
+  const admin = state.users.find((user) => normalizeEmail(user.email) === ADMIN_EMAIL);
+  if (!admin) return;
+  await supabaseRequest("bolao_users?on_conflict=id", {
+    method: "POST",
+    body: JSON.stringify(toDbUser(admin)),
+  });
+  await supabaseRequest("bolao_official_results?on_conflict=id", {
+    method: "POST",
+    body: JSON.stringify({ id: "official", results: state.officialResults || {}, updated_at: new Date().toISOString() }),
+  });
+}
+
+async function saveRemoteUser(user) {
+  if (!databaseReady) return;
+  await supabaseRequest("bolao_users?on_conflict=id", {
+    method: "POST",
+    body: JSON.stringify(toDbUser(user)),
+  });
+}
+
+async function saveRemotePredictions(userId) {
+  if (!databaseReady) return;
+  await supabaseRequest("bolao_predictions?on_conflict=user_id", {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId, predictions: state.predictions[userId] || {}, updated_at: new Date().toISOString() }),
+  });
+}
+
+async function saveRemoteOfficialResults() {
+  if (!databaseReady) return;
+  await supabaseRequest("bolao_official_results?on_conflict=id", {
+    method: "POST",
+    body: JSON.stringify({ id: "official", results: state.officialResults || {}, updated_at: new Date().toISOString() }),
+  });
+}
+
+async function saveRemoteHistory(item) {
+  if (!databaseReady || !item) return;
+  await supabaseRequest("bolao_history", {
+    method: "POST",
+    body: JSON.stringify({
+      id: item.id,
+      type: item.type,
+      detail: item.detail,
+      user_id: item.userId,
+      name: item.name,
+      email: item.email,
+      role: item.role,
+      created_at: item.createdAt,
+    }),
+  });
+}
+
+async function deleteRemoteParticipant(userId) {
+  if (!databaseReady) return;
+  await supabaseRequest(`bolao_users?id=eq.${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  });
+}
+
 function setAuthMode(nextMode) {
   mode = nextMode;
   const isSignup = mode === "signup";
@@ -186,10 +323,12 @@ function handleAuth(event) {
     state.users.push(user);
     state.currentUserId = user.id;
     state.predictions[user.id] = {};
-    recordHistory("Cadastro", user, "Participante cadastrado");
-    recordHistory("Login", user, "Primeiro acesso apos cadastro");
+    const createdHistory = recordHistory("Cadastro", user, "Participante cadastrado");
+    const loginHistory = recordHistory("Login", user, "Primeiro acesso apos cadastro");
     saveState();
     renderApp();
+    saveRemoteUser(user).then(() => saveRemotePredictions(user.id)).catch(showDatabaseError);
+    Promise.all([saveRemoteHistory(createdHistory), saveRemoteHistory(loginHistory)]).catch(showDatabaseError);
     return;
   }
 
@@ -200,14 +339,16 @@ function handleAuth(event) {
   }
   state.currentUserId = user.id;
   user.lastLoginAt = new Date().toISOString();
-  recordHistory("Login", user, "Acesso realizado");
+  const loginHistory = recordHistory("Login", user, "Acesso realizado");
   saveState();
   renderApp();
+  saveRemoteUser(user).catch(showDatabaseError);
+  saveRemoteHistory(loginHistory).catch(showDatabaseError);
 }
 
 function recordHistory(type, user, detail) {
   state.history = state.history || [];
-  state.history.unshift({
+  const item = {
     id: crypto.randomUUID(),
     type,
     detail,
@@ -216,8 +357,10 @@ function recordHistory(type, user, detail) {
     email: user.email,
     role: user.role,
     createdAt: new Date().toISOString(),
-  });
+  };
+  state.history.unshift(item);
   state.history = state.history.slice(0, 100);
+  return item;
 }
 
 function readScoreInputs(scope, prefix) {
@@ -243,6 +386,7 @@ function savePredictions() {
   state.predictions[user.id] = readScoreInputs(predictionGroups, "pred");
   saveState();
   renderApp();
+  saveRemotePredictions(user.id).catch(showDatabaseError);
 }
 
 function saveOfficialResults() {
@@ -250,6 +394,7 @@ function saveOfficialResults() {
   state.officialResults = readScoreInputs(officialGroups, "official");
   saveState();
   renderApp();
+  saveRemoteOfficialResults().catch(showDatabaseError);
 }
 
 function deleteParticipant(userId) {
@@ -258,9 +403,11 @@ function deleteParticipant(userId) {
   if (!target || target.role === "admin") return;
   state.users = state.users.filter((user) => user.id !== userId);
   delete state.predictions[userId];
-  recordHistory("Exclusao", target, "Participante excluido pelo administrador");
+  const deleteHistory = recordHistory("Exclusao", target, "Participante excluido pelo administrador");
   saveState();
   renderApp();
+  deleteRemoteParticipant(userId).catch(showDatabaseError);
+  saveRemoteHistory(deleteHistory).catch(showDatabaseError);
 }
 
 function handleLogout() {
@@ -526,6 +673,11 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function showDatabaseError(error) {
+  console.error(error);
+  authMessage.textContent = "Nao foi possivel sincronizar com o banco. Confira as tabelas no Supabase.";
+}
+
 function renderRanking() {
   const ranked = state.users
     .map((user) => ({ ...user, points: userScore(user.id) }))
@@ -618,11 +770,22 @@ document.querySelectorAll(".tab-button").forEach((button) => {
   button.addEventListener("click", () => switchTab(button.dataset.tab));
 });
 
+async function initializeApp() {
+  setAuthMode("login");
+  renderApp();
+  try {
+    await ensureRemoteSeed();
+    await loadRemoteState();
+    renderApp();
+  } catch (error) {
+    showDatabaseError(error);
+  }
+}
+
 window.switchTab = switchTab;
 window.savePredictions = savePredictions;
 window.saveOfficialResults = saveOfficialResults;
 window.deleteParticipant = deleteParticipant;
 window.handleLogout = handleLogout;
 
-setAuthMode("login");
-renderApp();
+initializeApp();
