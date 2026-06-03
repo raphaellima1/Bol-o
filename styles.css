@@ -41,6 +41,35 @@ button {
   display: none !important;
 }
 
+.toast-message {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 20;
+  max-width: min(360px, calc(100vw - 32px));
+  border-radius: 8px;
+  padding: 14px 16px;
+  color: #fff;
+  font-weight: 850;
+  box-shadow: var(--shadow);
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.toast-message.is-success {
+  background: var(--green);
+}
+
+.toast-message.is-error {
+  background: var(--red);
+}
+
+.toast-message.is-hiding {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
 .auth-shell {
   display: grid;
   min-height: 100vh;

@@ -232,10 +232,6 @@ async function ensureRemoteSeed() {
     method: "POST",
     body: JSON.stringify(toDbUser(admin)),
   });
-  await supabaseRequest("bolao_official_results?on_conflict=id", {
-    method: "POST",
-    body: JSON.stringify({ id: "official", results: state.officialResults || {}, updated_at: new Date().toISOString() }),
-  });
 }
 
 async function saveRemoteUser(user) {
@@ -398,21 +394,33 @@ function readScoreInputs(scope, prefix) {
   return values;
 }
 
-function savePredictions() {
+async function savePredictions() {
   const user = getCurrentUser();
   if (!user || isAdmin(user)) return;
   state.predictions[user.id] = readScoreInputs(predictionGroups, "pred");
   saveState();
-  renderApp();
-  saveRemotePredictions(user.id).catch(showDatabaseError);
+  try {
+    await saveRemotePredictions(user.id);
+    await loadRemoteState();
+    renderApp();
+  } catch (error) {
+    showDatabaseError(error);
+  }
 }
 
-function saveOfficialResults() {
+async function saveOfficialResults() {
   if (!isAdmin()) return;
   state.officialResults = readScoreInputs(officialGroups, "official");
   saveState();
-  renderApp();
-  saveRemoteOfficialResults().catch(showDatabaseError);
+  try {
+    await saveRemoteOfficialResults();
+    await loadRemoteState();
+    renderApp();
+    showToast("Resultados salvos com sucesso");
+  } catch (error) {
+    showDatabaseError(error);
+    showToast("Nao foi possivel salvar os resultados", "error");
+  }
 }
 
 function deleteParticipant(userId) {
@@ -694,6 +702,23 @@ function formatDate(value) {
 function showDatabaseError(error) {
   console.error(error);
   authMessage.textContent = "Nao foi possivel sincronizar com o banco. Confira as tabelas no Supabase.";
+}
+
+function showToast(message, type = "success") {
+  let toast = document.querySelector("#toastMessage");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "toastMessage";
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+    document.body.appendChild(toast);
+  }
+  toast.className = `toast-message ${type === "error" ? "is-error" : "is-success"}`;
+  toast.textContent = message;
+  window.clearTimeout(showToast.timeoutId);
+  showToast.timeoutId = window.setTimeout(() => {
+    toast.classList.add("is-hiding");
+  }, 2600);
 }
 
 function renderRanking() {
