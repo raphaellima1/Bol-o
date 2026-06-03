@@ -515,6 +515,45 @@ input:focus {
   background: #fff;
 }
 
+.points-detail-item {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.points-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.points-detail-head span {
+  flex: 0 0 auto;
+  color: var(--green);
+  font-weight: 900;
+}
+
+.points-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.points-detail-grid strong {
+  color: var(--ink);
+}
+
+.points-detail-item small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .participants-list {
   display: grid;
   gap: 10px;

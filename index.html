@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Painel do Bolao da Copa</title>
+    <title>Painel do Bolão da Copa</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -12,7 +12,7 @@
         <div class="brand-lockup">
           <img src="./assets/trophy.svg" alt="" class="brand-mark" />
           <div>
-            <p class="eyebrow">Bolao da Copa</p>
+            <p class="eyebrow">Bolão da Copa</p>
             <h1 id="authTitle">Entre no painel</h1>
           </div>
         </div>
@@ -29,11 +29,11 @@
           </label>
           <label>
             E-mail
-            <input id="emailInput" name="email" type="email" autocomplete="email" placeholder="voce@email.com" required />
+            <input id="emailInput" name="email" type="email" autocomplete="email" placeholder="seu@email.com" required />
           </label>
           <label>
             Senha
-            <input id="passwordInput" name="password" type="password" autocomplete="current-password" placeholder="Minimo 4 caracteres" required />
+            <input id="passwordInput" name="password" type="password" autocomplete="current-password" placeholder="Mínimo 4 caracteres" required />
           </label>
           <p id="authMessage" class="form-message" aria-live="polite"></p>
           <button class="primary-action" type="submit">
@@ -48,23 +48,23 @@
         <div class="brand-lockup compact">
           <img src="./assets/trophy.svg" alt="" class="brand-mark" />
           <div>
-            <p class="eyebrow">Bolao</p>
+            <p class="eyebrow">Bolão</p>
             <strong>Copa do Mundo</strong>
           </div>
         </div>
 
-        <nav class="tabs" aria-label="Navegacao principal">
+        <nav class="tabs" aria-label="Navegação principal">
           <button class="tab-button is-active" data-tab="predictions" type="button" onclick="switchTab('predictions')">
-            <span class="tab-icon">✎</span>
-            Simulacao
+            <span class="tab-icon">P</span>
+            Simulação
           </button>
           <button class="tab-button" data-tab="ranking" type="button" onclick="switchTab('ranking')">
-            <span class="tab-icon">▦</span>
+            <span class="tab-icon">R</span>
             Resultado e ranking
           </button>
           <button id="settingsMenuBtn" class="tab-button" data-tab="settings" type="button" onclick="switchTab('settings')">
-            <span class="tab-icon">⚙</span>
-            Configuracoes
+            <span class="tab-icon">C</span>
+            Configurações
           </button>
         </nav>
 
@@ -79,7 +79,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">Primeira fase</p>
-            <h2 id="pageTitle">Simulacao dos palpites</h2>
+            <h2 id="pageTitle">Simulação dos palpites</h2>
           </div>
           <div class="score-pill">
             <span>Pontos atuais</span>
@@ -91,7 +91,7 @@
           <div class="panel-intro">
             <div>
               <h3>Palpites da fase de grupos</h3>
-              <p>Preencha os placares e salve sua simulacao. A classificacao do grupo muda automaticamente.</p>
+              <p>Preencha os placares e salve sua simulação. A classificação do grupo muda automaticamente.</p>
             </div>
             <button id="savePredictionsBtn" class="primary-action" type="button" onclick="savePredictions()">Salvar palpites</button>
           </div>
@@ -101,11 +101,11 @@
         <section id="rankingTab" class="tab-panel is-hidden">
           <div class="ranking-layout">
             <section class="ranking-card">
-              <h3>Classificacao do bolao</h3>
+              <h3>Classificação do bolão</h3>
               <div id="rankingList" class="ranking-list"></div>
             </section>
             <section class="ranking-card">
-              <h3>Classificacao por grupo</h3>
+              <h3>Detalhamento dos pontos</h3>
               <div id="officialStandings" class="standings-stack"></div>
             </section>
           </div>
@@ -117,7 +117,7 @@
               <div class="panel-intro">
                 <div>
                   <h3>Resultados oficiais</h3>
-                  <p>Area do administrador para atualizar os placares reais e recalcular o bolao.</p>
+                  <p>Área do administrador para atualizar os placares reais e recalcular o bolão.</p>
                 </div>
                 <div class="action-row">
                   <button id="syncDatabaseBtn" class="ghost-action" type="button" onclick="syncDatabase()">Atualizar banco</button>
@@ -133,7 +133,7 @@
                 <div id="participantsList" class="participants-list"></div>
               </section>
               <section class="ranking-card">
-                <h3>Historico e usuarios</h3>
+                <h3>Histórico e usuários</h3>
                 <div id="userHistoryList" class="history-list"></div>
               </section>
             </aside>
@@ -142,6 +142,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=5"></script>
+    <script src="./app.js?v=6"></script>
   </body>
 </html>

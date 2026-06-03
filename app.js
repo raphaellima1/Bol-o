@@ -12,18 +12,18 @@ function flagUrl(code) {
 }
 
 const groups = [
-  { id: "A", teams: [team("Mexico", "mx"), team("Africa do Sul", "za"), team("Coreia do Sul", "kr"), team("Rep. Tcheca", "cz")] },
-  { id: "B", teams: [team("Canada", "ca"), team("Suica", "ch"), team("Catar", "qa"), team("Bosnia", "ba")] },
-  { id: "C", teams: [team("Brasil", "br"), team("Marrocos", "ma"), team("Haiti", "ht"), team("Escocia", "gb-sct")] },
-  { id: "D", teams: [team("Estados Unidos", "us"), team("Paraguai", "py"), team("Australia", "au"), team("Turquia", "tr")] },
-  { id: "E", teams: [team("Alemanha", "de"), team("Curacao", "cw"), team("C. do Marfim", "ci"), team("Equador", "ec")] },
-  { id: "F", teams: [team("Holanda", "nl"), team("Japao", "jp"), team("Tunisia", "tn"), team("Suecia", "se")] },
-  { id: "G", teams: [team("Belgica", "be"), team("Egito", "eg"), team("Ira", "ir"), team("Nova Zelandia", "nz")] },
-  { id: "H", teams: [team("Espanha", "es"), team("Cabo Verde", "cv"), team("Arabia Saudita", "sa"), team("Uruguai", "uy")] },
-  { id: "I", teams: [team("Franca", "fr"), team("Senegal", "sn"), team("Noruega", "no"), team("Iraque", "iq")] },
-  { id: "J", teams: [team("Argentina", "ar"), team("Argelia", "dz"), team("Austria", "at"), team("Jordania", "jo")] },
-  { id: "K", teams: [team("Portugal", "pt"), team("Uzbequistao", "uz"), team("Colombia", "co"), team("RD Congo", "cd")] },
-  { id: "L", teams: [team("Inglaterra", "gb-eng"), team("Croacia", "hr"), team("Gana", "gh"), team("Panama", "pa")] },
+  { id: "A", teams: [team("México", "mx"), team("África do Sul", "za"), team("Coreia do Sul", "kr"), team("Rep. Tcheca", "cz")] },
+  { id: "B", teams: [team("Canadá", "ca"), team("Suíça", "ch"), team("Catar", "qa"), team("Bósnia", "ba")] },
+  { id: "C", teams: [team("Brasil", "br"), team("Marrocos", "ma"), team("Haiti", "ht"), team("Escócia", "gb-sct")] },
+  { id: "D", teams: [team("Estados Unidos", "us"), team("Paraguai", "py"), team("Austrália", "au"), team("Turquia", "tr")] },
+  { id: "E", teams: [team("Alemanha", "de"), team("Curaçao", "cw"), team("Costa do Marfim", "ci"), team("Equador", "ec")] },
+  { id: "F", teams: [team("Holanda", "nl"), team("Japão", "jp"), team("Tunísia", "tn"), team("Suécia", "se")] },
+  { id: "G", teams: [team("Bélgica", "be"), team("Egito", "eg"), team("Irã", "ir"), team("Nova Zelândia", "nz")] },
+  { id: "H", teams: [team("Espanha", "es"), team("Cabo Verde", "cv"), team("Arábia Saudita", "sa"), team("Uruguai", "uy")] },
+  { id: "I", teams: [team("França", "fr"), team("Senegal", "sn"), team("Noruega", "no"), team("Iraque", "iq")] },
+  { id: "J", teams: [team("Argentina", "ar"), team("Argélia", "dz"), team("Áustria", "at"), team("Jordânia", "jo")] },
+  { id: "K", teams: [team("Portugal", "pt"), team("Uzbequistão", "uz"), team("Colômbia", "co"), team("RD Congo", "cd")] },
+  { id: "L", teams: [team("Inglaterra", "gb-eng"), team("Croácia", "hr"), team("Gana", "gh"), team("Panamá", "pa")] },
 ];
 
 const matches = groups.flatMap((group) => {
@@ -108,7 +108,7 @@ function migrateState(nextState) {
       password: ADMIN_PASSWORD,
       role: "admin",
       createdAt: new Date().toISOString(),
-      passwordHistory: [{ password: ADMIN_PASSWORD, changedAt: new Date().toISOString(), reason: "Administrador pre-configurado" }],
+      passwordHistory: [{ password: ADMIN_PASSWORD, changedAt: new Date().toISOString(), reason: "Administrador pré-configurado" }],
     };
     nextState.users.unshift(admin);
     nextState.predictions[admin.id] = nextState.predictions[admin.id] || {};
@@ -321,7 +321,7 @@ function handleAuth(event) {
       return;
     }
     if (state.users.some((user) => user.email === email)) {
-      authMessage.textContent = "Este e-mail ja esta cadastrado.";
+    authMessage.textContent = "Este e-mail já está cadastrado.";
       return;
     }
     const user = {
@@ -338,7 +338,7 @@ function handleAuth(event) {
     state.currentUserId = user.id;
     state.predictions[user.id] = {};
     const createdHistory = recordHistory("Cadastro", user, "Participante cadastrado");
-    const loginHistory = recordHistory("Login", user, "Primeiro acesso apos cadastro");
+    const loginHistory = recordHistory("Login", user, "Primeiro acesso após cadastro");
     saveState();
     renderApp();
     saveRemoteUser(user).then(() => saveRemotePredictions(user.id)).catch(showDatabaseError);
@@ -348,7 +348,7 @@ function handleAuth(event) {
 
   const user = state.users.find((item) => item.email === email && item.password === password);
   if (!user) {
-    authMessage.textContent = "E-mail ou senha nao encontrados.";
+    authMessage.textContent = "E-mail ou senha não encontrados.";
     return;
   }
   state.currentUserId = user.id;
@@ -419,7 +419,7 @@ async function saveOfficialResults() {
     showToast("Resultados salvos com sucesso");
   } catch (error) {
     showDatabaseError(error);
-    showToast("Nao foi possivel salvar os resultados", "error");
+    showToast("Não foi possível salvar os resultados", "error");
   }
 }
 
@@ -429,7 +429,7 @@ function deleteParticipant(userId) {
   if (!target || target.role === "admin") return;
   state.users = state.users.filter((user) => user.id !== userId);
   delete state.predictions[userId];
-  const deleteHistory = recordHistory("Exclusao", target, "Participante excluido pelo administrador");
+  const deleteHistory = recordHistory("Exclusão", target, "Participante excluído pelo administrador");
   saveState();
   renderApp();
   deleteRemoteParticipant(userId).catch(showDatabaseError);
@@ -457,6 +457,18 @@ function scorePrediction(prediction, official, match) {
   if (prediction.away === official.away) points += 1;
   if (winner(prediction, match) === winner(official, match)) points += 2;
   return points;
+}
+
+function pointReason(prediction, official, match) {
+  if (!prediction || !official || prediction.home === null || prediction.away === null || official.home === null || official.away === null) {
+    return "Aguardando palpite ou resultado oficial.";
+  }
+
+  const reasons = [];
+  if (prediction.home === official.home) reasons.push(`+1 gol de ${match.home}`);
+  if (prediction.away === official.away) reasons.push(`+1 gol de ${match.away}`);
+  if (winner(prediction, match) === winner(official, match)) reasons.push("+2 vencedor/empate");
+  return reasons.length ? reasons.join(" · ") : "Nenhum critério acertado.";
 }
 
 function userScore(userId) {
@@ -614,17 +626,48 @@ function renderOfficialGroups() {
       `;
     })
     .join("");
+}
 
-  officialStandings.innerHTML = groups
-    .map(
-      (group) => `
-        <div>
-          <h4>Grupo ${group.id}</h4>
-          ${standingsTable(buildStandings(group.id, state.officialResults))}
+function renderPointBreakdown() {
+  const user = getCurrentUser();
+  const predictions = state.predictions[user?.id] || {};
+  const completedMatches = matches.filter((match) => {
+    const official = state.officialResults[match.id];
+    return official && official.home !== null && official.away !== null;
+  });
+
+  if (!completedMatches.length) {
+    officialStandings.innerHTML = `<div class="empty-state">Os resultados oficiais ainda não foram lançados.</div>`;
+    return;
+  }
+
+  officialStandings.innerHTML = completedMatches
+    .map((match) => {
+      const prediction = predictions[match.id];
+      const official = state.officialResults[match.id];
+      const points = scorePrediction(prediction, official, match);
+      return `
+        <div class="points-detail-item">
+          <div class="points-detail-head">
+            <strong>Grupo ${match.groupId}: ${match.home} x ${match.away}</strong>
+            <span>${points} pts</span>
+          </div>
+          <div class="points-detail-grid">
+            <span>Seu palpite</span>
+            <strong>${formatScore(prediction)}</strong>
+            <span>Resultado oficial</span>
+            <strong>${formatScore(official)}</strong>
+          </div>
+          <small>${pointReason(prediction, official, match)}</small>
         </div>
-      `,
-    )
+      `;
+    })
     .join("");
+}
+
+function formatScore(score) {
+  if (!score || score.home === null || score.away === null) return "Não informado";
+  return `${score.home} x ${score.away}`;
 }
 
 function renderParticipants() {
@@ -641,7 +684,7 @@ function renderParticipants() {
           <div>
             <strong>${user.name}</strong>
             <span>${user.email}</span>
-            <small>Senha: ${user.password} · Cadastro: ${formatDate(user.createdAt)}</small>
+            <small>Senha: ${user.password} � Cadastro: ${formatDate(user.createdAt)}</small>
           </div>
           <button class="danger-action" type="button" data-delete-user="${user.id}" onclick="deleteParticipant('${user.id}')">Excluir</button>
         </div>
@@ -659,7 +702,7 @@ function renderUserHistory() {
           <span>${user.email}</span>
           <span>Perfil: ${user.role === "admin" ? "Administrador" : "Participante"}</span>
           <span>Senha atual: ${user.password}</span>
-          <span>Ultimo login: ${formatDate(user.lastLoginAt)}</span>
+          <span>�ltimo login: ${formatDate(user.lastLoginAt)}</span>
         </div>
       `,
     )
@@ -671,7 +714,7 @@ function renderUserHistory() {
       (item) => `
         <div class="history-item">
           <strong>${item.type}</strong>
-          <span>${item.name} · ${item.email}</span>
+          <span>${item.name} � ${item.email}</span>
           <span>${item.detail}</span>
           <small>${formatDate(item.createdAt)}</small>
         </div>
@@ -681,16 +724,15 @@ function renderUserHistory() {
 
   userHistoryList.innerHTML = `
     <div class="history-section">
-      <h4>Usuarios no banco local</h4>
-      ${usersMarkup || `<div class="empty-state">Nenhum usuario salvo.</div>`}
+      <h4>Usu�rios no banco</h4>
+      ${usersMarkup || `<div class="empty-state">Nenhum usu�rio salvo.</div>`}
     </div>
     <div class="history-section">
-      <h4>Historico de login e senha</h4>
-      ${historyMarkup || `<div class="empty-state">Nenhum historico registrado ainda.</div>`}
+      <h4>Hist�rico de login e senha</h4>
+      ${historyMarkup || `<div class="empty-state">Nenhum hist�rico registrado ainda.</div>`}
     </div>
   `;
 }
-
 function formatDate(value) {
   if (!value) return "Sem registro";
   return new Intl.DateTimeFormat("pt-BR", {
@@ -701,7 +743,7 @@ function formatDate(value) {
 
 function showDatabaseError(error) {
   console.error(error);
-  authMessage.textContent = "Nao foi possivel sincronizar com o banco. Confira as tabelas no Supabase.";
+  authMessage.textContent = "N�o foi poss�vel sincronizar com o banco. Confira as tabelas no Supabase.";
 }
 
 function showToast(message, type = "success") {
@@ -763,6 +805,7 @@ function renderApp() {
   document.querySelector(".score-pill").classList.toggle("is-hidden", isAdmin(user));
   renderPredictionGroups();
   renderOfficialGroups();
+  renderPointBreakdown();
   renderParticipants();
   renderUserHistory();
   renderRanking();
@@ -791,9 +834,9 @@ function switchTab(tabName) {
   document.querySelector("#rankingTab").classList.toggle("is-hidden", tabName !== "ranking");
   document.querySelector("#settingsTab").classList.toggle("is-hidden", tabName !== "settings");
   const titles = {
-    predictions: "Simulacao dos palpites",
-    ranking: "Resultados e classificacao",
-    settings: "Configuracoes",
+    predictions: "Simula��o dos palpites",
+    ranking: "Resultados e classifica��o",
+    settings: "Configura��es",
   };
   pageTitle.textContent = titles[tabName];
   if (tabName === "settings" && databaseReady) {
