@@ -620,6 +620,13 @@ input:focus {
   background: #fff;
 }
 
+.bracket-match-title {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .bracket-team {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

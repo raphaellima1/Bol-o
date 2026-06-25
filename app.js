@@ -500,12 +500,14 @@ function buildStandings(groupId, source) {
   }));
 
   const byTeam = Object.fromEntries(table.map((row) => [row.team, row]));
+  const playedMatches = [];
 
   matches
     .filter((match) => match.groupId === groupId)
     .forEach((match) => {
       const score = source[match.id];
       if (!score || score.home === null || score.away === null) return;
+      playedMatches.push({ ...match, score });
       const home = byTeam[match.home];
       const away = byTeam[match.away];
       home.played += 1;
@@ -535,8 +537,27 @@ function buildStandings(groupId, source) {
   });
 
   return table.sort((a, b) => {
-    return b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor || a.team.localeCompare(b.team);
+    const tiedTeams = table.filter((row) => row.points === a.points).map((row) => row.team);
+    const aHeadToHead = headToHeadPoints(a.team, tiedTeams, playedMatches);
+    const bHeadToHead = headToHeadPoints(b.team, tiedTeams, playedMatches);
+    return b.points - a.points || bHeadToHead - aHeadToHead || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor || a.team.localeCompare(b.team);
   });
+}
+
+function headToHeadPoints(teamName, tiedTeams, playedMatches) {
+  if (tiedTeams.length < 2) return 0;
+  return playedMatches.reduce((points, match) => {
+    if (!tiedTeams.includes(match.home) || !tiedTeams.includes(match.away)) return points;
+    if (match.home === teamName) {
+      if (match.score.home > match.score.away) return points + 3;
+      if (match.score.home === match.score.away) return points + 1;
+    }
+    if (match.away === teamName) {
+      if (match.score.away > match.score.home) return points + 3;
+      if (match.score.away === match.score.home) return points + 1;
+    }
+    return points;
+  }, 0);
 }
 
 function scoreValue(source, matchId, side) {
@@ -648,34 +669,148 @@ function qualifiedTeams(source) {
     .slice(0, 32);
 }
 
-function knockoutRounds(source, choices) {
-  const rounds = [
-    { key: "R32", title: "16 avos de final" },
-    { key: "R16", title: "Oitavas de final" },
-    { key: "QF", title: "Quartas de final" },
-    { key: "SF", title: "Semifinais" },
-    { key: "F", title: "Final" },
+function groupQualifiers(source) {
+  return Object.fromEntries(
+    groups.map((group) => {
+      const standings = buildStandings(group.id, source).map((row, index) => ({
+        ...row,
+        groupId: group.id,
+        groupRank: index + 1,
+      }));
+      return [group.id, { winner: standings[0], runnerUp: standings[1], third: standings[2] }];
+    }),
+  );
+}
+
+function bestThirdPlacedTeams(source) {
+  return Object.values(groupQualifiers(source))
+    .map((group) => group.third)
+    .filter(Boolean)
+    .sort((a, b) => b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor || a.team.localeCompare(b.team))
+    .slice(0, 8)
+    .map((team, index) => ({ ...team, thirdRank: index + 1 }));
+}
+
+const roundOf32ThirdSlots = {
+  M74: ["A", "B", "C", "D", "F"],
+  M77: ["C", "D", "F", "G", "H"],
+  M79: ["C", "E", "F", "H", "I"],
+  M80: ["E", "H", "I", "J", "K"],
+  M81: ["B", "E", "F", "I", "J"],
+  M82: ["A", "E", "H", "I", "J"],
+  M85: ["E", "F", "G", "I", "J"],
+  M87: ["D", "E", "I", "J", "L"],
+};
+
+function assignThirdPlacedTeams(source) {
+  const thirds = bestThirdPlacedTeams(source);
+  const slots = Object.entries(roundOf32ThirdSlots)
+    .map(([matchId, eligibleGroups]) => ({
+      matchId,
+      eligibleGroups,
+      candidates: thirds.filter((team) => eligibleGroups.includes(team.groupId)),
+    }))
+    .sort((a, b) => a.candidates.length - b.candidates.length || a.matchId.localeCompare(b.matchId));
+
+  function backtrack(index, usedGroups, assignment) {
+    if (index === slots.length) return assignment;
+    const slot = slots[index];
+    for (const candidate of slot.candidates) {
+      if (usedGroups.has(candidate.groupId)) continue;
+      const nextUsed = new Set(usedGroups);
+      nextUsed.add(candidate.groupId);
+      const result = backtrack(index + 1, nextUsed, { ...assignment, [slot.matchId]: candidate });
+      if (result) return result;
+    }
+    return null;
+  }
+
+  return backtrack(0, new Set(), {}) || {};
+}
+
+function roundOf32Matches(source, choices) {
+  const qualifiers = groupQualifiers(source);
+  const thirdAssignments = assignThirdPlacedTeams(source);
+  const rank = (groupId, position) => {
+    const group = qualifiers[groupId];
+    if (position === 1) return group?.winner;
+    if (position === 2) return group?.runnerUp;
+    return group?.third;
+  };
+  const third = (matchId) => thirdAssignments[matchId] || null;
+  const defs = [
+    ["M73", "2º Grupo A", rank("A", 2), "2º Grupo B", rank("B", 2)],
+    ["M74", "1º Grupo E", rank("E", 1), "3º A/B/C/D/F", third("M74")],
+    ["M75", "1º Grupo F", rank("F", 1), "2º Grupo C", rank("C", 2)],
+    ["M76", "1º Grupo C", rank("C", 1), "2º Grupo F", rank("F", 2)],
+    ["M77", "1º Grupo I", rank("I", 1), "3º C/D/F/G/H", third("M77")],
+    ["M78", "2º Grupo E", rank("E", 2), "2º Grupo I", rank("I", 2)],
+    ["M79", "1º Grupo A", rank("A", 1), "3º C/E/F/H/I", third("M79")],
+    ["M80", "1º Grupo L", rank("L", 1), "3º E/H/I/J/K", third("M80")],
+    ["M81", "1º Grupo D", rank("D", 1), "3º B/E/F/I/J", third("M81")],
+    ["M82", "1º Grupo G", rank("G", 1), "3º A/E/H/I/J", third("M82")],
+    ["M83", "2º Grupo K", rank("K", 2), "2º Grupo L", rank("L", 2)],
+    ["M84", "1º Grupo H", rank("H", 1), "2º Grupo J", rank("J", 2)],
+    ["M85", "1º Grupo B", rank("B", 1), "3º E/F/G/I/J", third("M85")],
+    ["M86", "1º Grupo J", rank("J", 1), "2º Grupo H", rank("H", 2)],
+    ["M87", "1º Grupo K", rank("K", 1), "3º D/E/I/J/L", third("M87")],
+    ["M88", "2º Grupo D", rank("D", 2), "2º Grupo G", rank("G", 2)],
   ];
 
-  let teams = qualifiedTeams(source);
-  return rounds.map((round) => {
-    const matchesForRound = [];
-    for (let index = 0; index < teams.length / 2; index += 1) {
-      const home = teams[index];
-      const away = teams[teams.length - 1 - index];
-      const matchId = `${round.key}-${index + 1}`;
-      const selectedWinner = choices[matchId];
-      const winner = [home?.team, away?.team].includes(selectedWinner) ? selectedWinner : "";
-      matchesForRound.push({ ...round, id: matchId, home, away, winner });
-    }
-    teams = matchesForRound.map((match) => {
-      const winnerName = match.winner;
-      if (!winnerName) return null;
-      const sourceTeam = [match.home, match.away].find((item) => item?.team === winnerName);
-      return sourceTeam || { team: winnerName, code: getTeamCode(winnerName), points: 0, goalDiff: 0, goalsFor: 0 };
-    }).filter(Boolean);
-    return { ...round, matches: matchesForRound };
-  });
+  return defs.map(([id, homeLabel, home, awayLabel, away]) => buildKnockoutMatch(id, "R32", "16 avos de final", home, away, choices, homeLabel, awayLabel));
+}
+
+function buildKnockoutMatch(id, key, title, home, away, choices, homeLabel = "", awayLabel = "") {
+  const selectedWinner = choices[id];
+  const winner = [home?.team, away?.team].includes(selectedWinner) ? selectedWinner : "";
+  return { id, key, title, home, away, winner, homeLabel, awayLabel };
+}
+
+function nextRoundEntry(match) {
+  if (!match.winner) return { team: `Vencedor ${match.id}`, code: "", placeholder: true };
+  const entry = [match.home, match.away].find((item) => item?.team === match.winner);
+  return entry || { team: match.winner, code: getTeamCode(match.winner) };
+}
+
+function knockoutRounds(source, choices) {
+  const r32 = roundOf32Matches(source, choices);
+  const byId = Object.fromEntries(r32.map((match) => [match.id, match]));
+  const makeRound = (key, title, pairs) =>
+    pairs.map(([id, homeId, awayId]) => {
+      const match = buildKnockoutMatch(id, key, title, nextRoundEntry(byId[homeId]), nextRoundEntry(byId[awayId]), choices, `Vencedor ${homeId}`, `Vencedor ${awayId}`);
+      byId[id] = match;
+      return match;
+    });
+
+  const r16 = makeRound("R16", "Oitavas de final", [
+    ["M89", "M73", "M75"],
+    ["M90", "M74", "M77"],
+    ["M91", "M76", "M78"],
+    ["M92", "M79", "M80"],
+    ["M93", "M83", "M84"],
+    ["M94", "M81", "M82"],
+    ["M95", "M86", "M88"],
+    ["M96", "M85", "M87"],
+  ]);
+  const qf = makeRound("QF", "Quartas de final", [
+    ["M97", "M89", "M90"],
+    ["M98", "M93", "M94"],
+    ["M99", "M91", "M92"],
+    ["M100", "M95", "M96"],
+  ]);
+  const sf = makeRound("SF", "Semifinais", [
+    ["M101", "M97", "M98"],
+    ["M102", "M99", "M100"],
+  ]);
+  const final = makeRound("F", "Final", [["M104", "M101", "M102"]]);
+
+  return [
+    { key: "R32", title: "16 avos de final", matches: r32 },
+    { key: "R16", title: "Oitavas de final", matches: r16 },
+    { key: "QF", title: "Quartas de final", matches: qf },
+    { key: "SF", title: "Semifinais", matches: sf },
+    { key: "F", title: "Final", matches: final },
+  ];
 }
 
 function renderKnockoutSimulation() {
@@ -713,6 +848,7 @@ function renderKnockoutSimulation() {
 function knockoutMatchMarkup(match) {
   return `
     <article class="bracket-match">
+      <div class="bracket-match-title">${match.id}</div>
       ${knockoutTeamButton(match, match.home)}
       ${knockoutTeamButton(match, match.away)}
     </article>
@@ -721,12 +857,13 @@ function knockoutMatchMarkup(match) {
 
 function knockoutTeamButton(match, entry) {
   const isSelected = entry?.team && match.winner === entry.team;
-  const disabled = !entry?.team;
+  const disabled = !entry?.team || entry.placeholder;
+  const label = entry === match.home ? match.homeLabel : match.awayLabel;
   return `
     <button class="bracket-team ${isSelected ? "is-selected" : ""}" type="button" data-knockout-match="${match.id}" data-winner="${entry?.team || ""}" ${disabled ? "disabled" : ""}>
-      ${entry?.team ? flagImage(entry.code || getTeamCode(entry.team), entry.team) : ""}
+      ${entry?.team && !entry.placeholder ? flagImage(entry.code || getTeamCode(entry.team), entry.team) : ""}
       <span>${entry?.team || "A definir"}</span>
-      ${entry?.groupId ? `<small>${entry.groupRank}º Grupo ${entry.groupId}</small>` : ""}
+      <small>${entry?.groupId ? `${entry.groupRank}º Grupo ${entry.groupId}` : label}</small>
     </button>
   `;
 }
