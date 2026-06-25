@@ -58,6 +58,10 @@
             <span class="tab-icon">P</span>
             Simulação
           </button>
+          <button class="tab-button" data-tab="knockout" type="button" onclick="switchTab('knockout')">
+            <span class="tab-icon">M</span>
+            Mata-mata
+          </button>
           <button class="tab-button" data-tab="ranking" type="button" onclick="switchTab('ranking')">
             <span class="tab-icon">R</span>
             Resultado e ranking
@@ -111,6 +115,17 @@
           </div>
         </section>
 
+        <section id="knockoutTab" class="tab-panel is-hidden">
+          <div class="panel-intro">
+            <div>
+              <h3>Simulação do mata-mata</h3>
+              <p>A chave usa a classificação projetada nos seus palpites da fase de grupos.</p>
+            </div>
+            <button id="saveKnockoutBtn" class="primary-action" type="button" onclick="saveKnockoutSimulation()">Salvar mata-mata</button>
+          </div>
+          <div id="knockoutBracket" class="bracket-board"></div>
+        </section>
+
         <section id="settingsTab" class="tab-panel is-hidden">
           <div class="split-layout">
             <section>
@@ -142,6 +157,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=6"></script>
+    <script src="./app.js?v=7"></script>
   </body>
 </html>

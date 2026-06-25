@@ -66,6 +66,7 @@ const currentUserRole = document.querySelector("#currentUserRole");
 const currentScore = document.querySelector("#currentScore");
 const pageTitle = document.querySelector("#pageTitle");
 const predictionGroups = document.querySelector("#predictionGroups");
+const knockoutBracket = document.querySelector("#knockoutBracket");
 const officialGroups = document.querySelector("#officialGroups");
 const officialStandings = document.querySelector("#officialStandings");
 const rankingList = document.querySelector("#rankingList");
@@ -397,7 +398,12 @@ function readScoreInputs(scope, prefix) {
 async function savePredictions() {
   const user = getCurrentUser();
   if (!user || isAdmin(user)) return;
-  state.predictions[user.id] = readScoreInputs(predictionGroups, "pred");
+  const existing = state.predictions[user.id] || {};
+  const groupScores = readScoreInputs(predictionGroups, "pred");
+  state.predictions[user.id] = {
+    ...Object.fromEntries(Object.entries(existing).filter(([key]) => !matches.some((match) => match.id === key))),
+    ...groupScores,
+  };
   saveState();
   try {
     await saveRemotePredictions(user.id);
@@ -612,6 +618,135 @@ function renderPredictionGroups() {
     .join("");
 }
 
+function getTeamCode(teamName) {
+  return groups.flatMap((group) => group.teams).find((item) => item.name === teamName)?.code || "";
+}
+
+function qualifiedTeams(source) {
+  const direct = [];
+  const thirds = [];
+
+  groups.forEach((group) => {
+    const standings = buildStandings(group.id, source).map((row, index) => ({
+      ...row,
+      groupId: group.id,
+      groupRank: index + 1,
+    }));
+    direct.push(...standings.slice(0, 2));
+    thirds.push(standings[2]);
+  });
+
+  const bestThirds = thirds
+    .filter(Boolean)
+    .sort((a, b) => b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor || a.team.localeCompare(b.team))
+    .slice(0, 8);
+
+  return [...direct, ...bestThirds]
+    .sort((a, b) => {
+      return a.groupRank - b.groupRank || b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor || a.team.localeCompare(b.team);
+    })
+    .slice(0, 32);
+}
+
+function knockoutRounds(source, choices) {
+  const rounds = [
+    { key: "R32", title: "16 avos de final" },
+    { key: "R16", title: "Oitavas de final" },
+    { key: "QF", title: "Quartas de final" },
+    { key: "SF", title: "Semifinais" },
+    { key: "F", title: "Final" },
+  ];
+
+  let teams = qualifiedTeams(source);
+  return rounds.map((round) => {
+    const matchesForRound = [];
+    for (let index = 0; index < teams.length / 2; index += 1) {
+      const home = teams[index];
+      const away = teams[teams.length - 1 - index];
+      const matchId = `${round.key}-${index + 1}`;
+      const selectedWinner = choices[matchId];
+      const winner = [home?.team, away?.team].includes(selectedWinner) ? selectedWinner : "";
+      matchesForRound.push({ ...round, id: matchId, home, away, winner });
+    }
+    teams = matchesForRound.map((match) => {
+      const winnerName = match.winner;
+      if (!winnerName) return null;
+      const sourceTeam = [match.home, match.away].find((item) => item?.team === winnerName);
+      return sourceTeam || { team: winnerName, code: getTeamCode(winnerName), points: 0, goalDiff: 0, goalsFor: 0 };
+    }).filter(Boolean);
+    return { ...round, matches: matchesForRound };
+  });
+}
+
+function renderKnockoutSimulation() {
+  const user = getCurrentUser();
+  const source = state.predictions[user?.id] || {};
+  const choices = source.knockout || {};
+  const qualifiers = qualifiedTeams(source);
+
+  if (qualifiers.length < 32) {
+    knockoutBracket.innerHTML = `<div class="empty-state">Preencha os palpites da fase de grupos para montar a chave do mata-mata.</div>`;
+    return;
+  }
+
+  const rounds = knockoutRounds(source, choices);
+  const champion = rounds.at(-1)?.matches[0]?.winner;
+  knockoutBracket.innerHTML = `
+    ${champion ? `<div class="champion-banner"><span>CampeÃ£o simulado</span><strong>${flagImage(getTeamCode(champion), champion)} ${champion}</strong></div>` : ""}
+    <div class="bracket-columns">
+      ${rounds
+        .map(
+          (round) => `
+            <section class="bracket-round">
+              <h4>${round.title}</h4>
+              <div class="bracket-match-list">
+                ${round.matches.map((match) => knockoutMatchMarkup(match)).join("")}
+              </div>
+            </section>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function knockoutMatchMarkup(match) {
+  return `
+    <article class="bracket-match">
+      ${knockoutTeamButton(match, match.home)}
+      ${knockoutTeamButton(match, match.away)}
+    </article>
+  `;
+}
+
+function knockoutTeamButton(match, entry) {
+  const isSelected = entry?.team && match.winner === entry.team;
+  const disabled = !entry?.team;
+  return `
+    <button class="bracket-team ${isSelected ? "is-selected" : ""}" type="button" data-knockout-match="${match.id}" data-winner="${entry?.team || ""}" ${disabled ? "disabled" : ""}>
+      ${entry?.team ? flagImage(entry.code || getTeamCode(entry.team), entry.team) : ""}
+      <span>${entry?.team || "A definir"}</span>
+      ${entry?.groupId ? `<small>${entry.groupRank}Âº Grupo ${entry.groupId}</small>` : ""}
+    </button>
+  `;
+}
+
+async function saveKnockoutSimulation() {
+  const user = getCurrentUser();
+  if (!user || isAdmin(user)) return;
+  state.predictions[user.id] = state.predictions[user.id] || {};
+  saveState();
+  try {
+    await saveRemotePredictions(user.id);
+    await loadRemoteState();
+    renderApp();
+    showToast("Mata-mata salvo com sucesso");
+  } catch (error) {
+    showDatabaseError(error);
+    showToast("NÃ£o foi possÃ­vel salvar o mata-mata", "error");
+  }
+}
+
 function renderOfficialGroups() {
   officialGroups.innerHTML = groups
     .map((group) => {
@@ -684,7 +819,7 @@ function renderParticipants() {
           <div>
             <strong>${user.name}</strong>
             <span>${user.email}</span>
-            <small>Senha: ${user.password} · Cadastro: ${formatDate(user.createdAt)}</small>
+            <small>Senha: ${user.password} Â· Cadastro: ${formatDate(user.createdAt)}</small>
           </div>
           <button class="danger-action" type="button" data-delete-user="${user.id}" onclick="deleteParticipant('${user.id}')">Excluir</button>
         </div>
@@ -702,7 +837,7 @@ function renderUserHistory() {
           <span>${user.email}</span>
           <span>Perfil: ${user.role === "admin" ? "Administrador" : "Participante"}</span>
           <span>Senha atual: ${user.password}</span>
-          <span>Último login: ${formatDate(user.lastLoginAt)}</span>
+          <span>Ãšltimo login: ${formatDate(user.lastLoginAt)}</span>
         </div>
       `,
     )
@@ -714,7 +849,7 @@ function renderUserHistory() {
       (item) => `
         <div class="history-item">
           <strong>${item.type}</strong>
-          <span>${item.name} · ${item.email}</span>
+          <span>${item.name} Â· ${item.email}</span>
           <span>${item.detail}</span>
           <small>${formatDate(item.createdAt)}</small>
         </div>
@@ -724,12 +859,12 @@ function renderUserHistory() {
 
   userHistoryList.innerHTML = `
     <div class="history-section">
-      <h4>Usuários no banco</h4>
-      ${usersMarkup || `<div class="empty-state">Nenhum usuário salvo.</div>`}
+      <h4>UsuÃ¡rios no banco</h4>
+      ${usersMarkup || `<div class="empty-state">Nenhum usuÃ¡rio salvo.</div>`}
     </div>
     <div class="history-section">
-      <h4>Histórico de login e senha</h4>
-      ${historyMarkup || `<div class="empty-state">Nenhum histórico registrado ainda.</div>`}
+      <h4>HistÃ³rico de login e senha</h4>
+      ${historyMarkup || `<div class="empty-state">Nenhum histÃ³rico registrado ainda.</div>`}
     </div>
   `;
 }
@@ -743,7 +878,7 @@ function formatDate(value) {
 
 function showDatabaseError(error) {
   console.error(error);
-  authMessage.textContent = "Não foi possível sincronizar com o banco. Confira as tabelas no Supabase.";
+  authMessage.textContent = "NÃ£o foi possÃ­vel sincronizar com o banco. Confira as tabelas no Supabase.";
 }
 
 function showToast(message, type = "success") {
@@ -801,9 +936,11 @@ function renderApp() {
   currentScore.textContent = userScore(user.id);
   settingsMenuBtn.classList.toggle("is-hidden", !isAdmin(user));
   document.querySelector('[data-tab="predictions"]').classList.toggle("is-hidden", isAdmin(user));
+  document.querySelector('[data-tab="knockout"]').classList.toggle("is-hidden", isAdmin(user));
   document.querySelector('[data-tab="ranking"]').classList.toggle("is-hidden", isAdmin(user));
   document.querySelector(".score-pill").classList.toggle("is-hidden", isAdmin(user));
   renderPredictionGroups();
+  renderKnockoutSimulation();
   renderOfficialGroups();
   renderPointBreakdown();
   renderParticipants();
@@ -831,12 +968,14 @@ function switchTab(tabName) {
     button.classList.toggle("is-active", button.dataset.tab === tabName);
   });
   document.querySelector("#predictionsTab").classList.toggle("is-hidden", tabName !== "predictions");
+  document.querySelector("#knockoutTab").classList.toggle("is-hidden", tabName !== "knockout");
   document.querySelector("#rankingTab").classList.toggle("is-hidden", tabName !== "ranking");
   document.querySelector("#settingsTab").classList.toggle("is-hidden", tabName !== "settings");
   const titles = {
-    predictions: "Simulação dos palpites",
-    ranking: "Resultados e classificação",
-    settings: "Configurações",
+    predictions: "SimulaÃ§Ã£o dos palpites",
+    knockout: "SimulaÃ§Ã£o do mata-mata",
+    ranking: "Resultados e classificaÃ§Ã£o",
+    settings: "ConfiguraÃ§Ãµes",
   };
   pageTitle.textContent = titles[tabName];
   if (tabName === "settings" && databaseReady) {
@@ -854,6 +993,20 @@ participantsList.addEventListener("click", (event) => {
   if (!button) return;
   deleteParticipant(button.dataset.deleteUser);
 });
+knockoutBracket.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-knockout-match]");
+  const user = getCurrentUser();
+  if (!button || !user || isAdmin(user) || button.disabled) return;
+  const winnerName = button.dataset.winner;
+  if (!winnerName) return;
+  state.predictions[user.id] = state.predictions[user.id] || {};
+  state.predictions[user.id].knockout = {
+    ...(state.predictions[user.id].knockout || {}),
+    [button.dataset.knockoutMatch]: winnerName,
+  };
+  saveState();
+  renderKnockoutSimulation();
+});
 document.querySelector("#logoutBtn").addEventListener("click", handleLogout);
 document.querySelectorAll(".tab-button").forEach((button) => {
   button.addEventListener("click", () => switchTab(button.dataset.tab));
@@ -868,6 +1021,7 @@ async function initializeApp() {
 window.switchTab = switchTab;
 window.syncDatabase = syncDatabase;
 window.savePredictions = savePredictions;
+window.saveKnockoutSimulation = saveKnockoutSimulation;
 window.saveOfficialResults = saveOfficialResults;
 window.deleteParticipant = deleteParticipant;
 window.handleLogout = handleLogout;
