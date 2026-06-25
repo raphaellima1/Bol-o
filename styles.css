@@ -506,13 +506,49 @@ input:focus {
 
 .ranking-item {
   display: grid;
-  grid-template-columns: 34px 1fr auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
   background: #fff;
+}
+
+.ranking-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ranking-name small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.points-section-title {
+  margin: 6px 0 0;
+  color: var(--green-dark);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
+
+.official-knockout-section {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.official-knockout-section h3,
+.official-knockout-section p {
+  margin: 0;
+}
+
+.official-knockout-section p {
+  color: var(--muted);
 }
 
 .points-detail-item {

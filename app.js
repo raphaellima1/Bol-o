@@ -67,6 +67,7 @@ const currentScore = document.querySelector("#currentScore");
 const pageTitle = document.querySelector("#pageTitle");
 const predictionGroups = document.querySelector("#predictionGroups");
 const knockoutBracket = document.querySelector("#knockoutBracket");
+const officialKnockoutBracket = document.querySelector("#officialKnockoutBracket");
 const officialGroups = document.querySelector("#officialGroups");
 const officialStandings = document.querySelector("#officialStandings");
 const rankingList = document.querySelector("#rankingList");
@@ -416,7 +417,11 @@ async function savePredictions() {
 
 async function saveOfficialResults() {
   if (!isAdmin()) return;
-  state.officialResults = readScoreInputs(officialGroups, "official");
+  state.officialResults = {
+    ...readScoreInputs(officialGroups, "official"),
+    knockout: state.officialResults.knockout || {},
+  };
+  state.officialResults.knockout = validKnockoutChoices(state.officialResults, state.officialResults.knockout);
   saveState();
   try {
     await saveRemoteOfficialResults();
@@ -478,10 +483,40 @@ function pointReason(prediction, official, match) {
 }
 
 function userScore(userId) {
+  return groupStageScore(userId) + knockoutScore(userId);
+}
+
+function groupStageScore(userId) {
   const prediction = state.predictions[userId] || {};
   return matches.reduce((total, match) => {
     return total + scorePrediction(prediction[match.id], state.officialResults[match.id], match);
   }, 0);
+}
+
+function knockoutScore(userId) {
+  const predictions = state.predictions[userId]?.knockout || {};
+  const official = validKnockoutChoices(state.officialResults, state.officialResults.knockout || {});
+  return Object.entries(official).reduce((total, [matchId, winnerName]) => {
+    if (!winnerName) return total;
+    return predictions[matchId] === winnerName ? total + 4 : total;
+  }, 0);
+}
+
+function validKnockoutChoices(source, choices) {
+  if (!hasCompleteGroupStage(source) || qualifiedTeams(source).length < 32) return {};
+  return Object.fromEntries(
+    knockoutRounds(source, choices)
+      .flatMap((round) => round.matches)
+      .filter((match) => match.winner)
+      .map((match) => [match.id, match.winner]),
+  );
+}
+
+function hasCompleteGroupStage(source) {
+  return matches.every((match) => {
+    const score = source[match.id];
+    return score && score.home !== null && score.away !== null;
+  });
 }
 
 function buildStandings(groupId, source) {
@@ -815,16 +850,16 @@ function knockoutRounds(source, choices) {
 
 function renderKnockoutSimulation() {
   const user = getCurrentUser();
-  const source = state.predictions[user?.id] || {};
-  const choices = source.knockout || {};
-  const qualifiers = qualifiedTeams(source);
+  const choices = state.predictions[user?.id]?.knockout || {};
+  const groupStageComplete = hasCompleteGroupStage(state.officialResults);
+  const qualifiers = groupStageComplete ? qualifiedTeams(state.officialResults) : [];
 
   if (qualifiers.length < 32) {
-    knockoutBracket.innerHTML = `<div class="empty-state">Preencha os palpites da fase de grupos para montar a chave do mata-mata.</div>`;
+    knockoutBracket.innerHTML = `<div class="empty-state">A chave do mata-mata será liberada quando o administrador lançar os resultados da fase de grupos.</div>`;
     return;
   }
 
-  const rounds = knockoutRounds(source, choices);
+  const rounds = knockoutRounds(state.officialResults, choices);
   const champion = rounds.at(-1)?.matches[0]?.winner;
   knockoutBracket.innerHTML = `
     ${champion ? `<div class="champion-banner"><span>Campeão simulado</span><strong>${flagImage(getTeamCode(champion), champion)} ${champion}</strong></div>` : ""}
@@ -845,22 +880,53 @@ function renderKnockoutSimulation() {
   `;
 }
 
-function knockoutMatchMarkup(match) {
+function renderOfficialKnockoutSimulation() {
+  const choices = state.officialResults.knockout || {};
+  const groupStageComplete = hasCompleteGroupStage(state.officialResults);
+  const qualifiers = groupStageComplete ? qualifiedTeams(state.officialResults) : [];
+
+  if (qualifiers.length < 32) {
+    officialKnockoutBracket.innerHTML = `<div class="empty-state">Lance os resultados dos grupos para montar a chave oficial do mata-mata.</div>`;
+    return;
+  }
+
+  const rounds = knockoutRounds(state.officialResults, choices);
+  const champion = rounds.at(-1)?.matches[0]?.winner;
+  officialKnockoutBracket.innerHTML = `
+    ${champion ? `<div class="champion-banner"><span>Campeão oficial</span><strong>${flagImage(getTeamCode(champion), champion)} ${champion}</strong></div>` : ""}
+    <div class="bracket-columns">
+      ${rounds
+        .map(
+          (round) => `
+            <section class="bracket-round">
+              <h4>${round.title}</h4>
+              <div class="bracket-match-list">
+                ${round.matches.map((match) => knockoutMatchMarkup(match, "official")).join("")}
+              </div>
+            </section>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function knockoutMatchMarkup(match, mode = "prediction") {
   return `
     <article class="bracket-match">
       <div class="bracket-match-title">${match.id}</div>
-      ${knockoutTeamButton(match, match.home)}
-      ${knockoutTeamButton(match, match.away)}
+      ${knockoutTeamButton(match, match.home, mode)}
+      ${knockoutTeamButton(match, match.away, mode)}
     </article>
   `;
 }
 
-function knockoutTeamButton(match, entry) {
+function knockoutTeamButton(match, entry, mode = "prediction") {
   const isSelected = entry?.team && match.winner === entry.team;
   const disabled = !entry?.team || entry.placeholder;
   const label = entry === match.home ? match.homeLabel : match.awayLabel;
   return `
-    <button class="bracket-team ${isSelected ? "is-selected" : ""}" type="button" data-knockout-match="${match.id}" data-winner="${entry?.team || ""}" ${disabled ? "disabled" : ""}>
+    <button class="bracket-team ${isSelected ? "is-selected" : ""}" type="button" data-knockout-mode="${mode}" data-knockout-match="${match.id}" data-winner="${entry?.team || ""}" ${disabled ? "disabled" : ""}>
       ${entry?.team && !entry.placeholder ? flagImage(entry.code || getTeamCode(entry.team), entry.team) : ""}
       <span>${entry?.team || "A definir"}</span>
       <small>${entry?.groupId ? `${entry.groupRank}º Grupo ${entry.groupId}` : label}</small>
@@ -907,13 +973,16 @@ function renderPointBreakdown() {
     const official = state.officialResults[match.id];
     return official && official.home !== null && official.away !== null;
   });
+  const knockoutOfficial = validKnockoutChoices(state.officialResults, state.officialResults.knockout || {});
+  const knockoutPredictions = predictions.knockout || {};
+  const knockoutItems = Object.entries(knockoutOfficial).filter(([, winnerName]) => Boolean(winnerName));
 
-  if (!completedMatches.length) {
+  if (!completedMatches.length && !knockoutItems.length) {
     officialStandings.innerHTML = `<div class="empty-state">Os resultados oficiais ainda não foram lançados.</div>`;
     return;
   }
 
-  officialStandings.innerHTML = completedMatches
+  const groupMarkup = completedMatches
     .map((match) => {
       const prediction = predictions[match.id];
       const official = state.officialResults[match.id];
@@ -935,6 +1004,32 @@ function renderPointBreakdown() {
       `;
     })
     .join("");
+  const knockoutMarkup = knockoutItems
+    .map(([matchId, officialWinner]) => {
+      const predictionWinner = knockoutPredictions[matchId] || "Não informado";
+      const points = predictionWinner === officialWinner ? 4 : 0;
+      return `
+        <div class="points-detail-item">
+          <div class="points-detail-head">
+            <strong>${matchId}: vencedor</strong>
+            <span>${points} pts</span>
+          </div>
+          <div class="points-detail-grid">
+            <span>Seu palpite</span>
+            <strong>${predictionWinner}</strong>
+            <span>Resultado oficial</span>
+            <strong>${officialWinner}</strong>
+          </div>
+          <small>${points === 4 ? "+4 vencedor correto" : "Vencedor diferente do oficial."}</small>
+        </div>
+      `;
+    })
+    .join("");
+
+  officialStandings.innerHTML = `
+    ${groupMarkup ? `<h4 class="points-section-title">1ª fase</h4>${groupMarkup}` : ""}
+    ${knockoutMarkup ? `<h4 class="points-section-title">Mata-mata</h4>${knockoutMarkup}` : ""}
+  `;
 }
 
 function formatScore(score) {
@@ -1037,7 +1132,12 @@ function showToast(message, type = "success") {
 
 function renderRanking() {
   const ranked = state.users
-    .map((user) => ({ ...user, points: userScore(user.id) }))
+    .filter((user) => user.role !== "admin")
+    .map((user) => {
+      const groupPoints = groupStageScore(user.id);
+      const knockoutPoints = knockoutScore(user.id);
+      return { ...user, groupPoints, knockoutPoints, points: groupPoints + knockoutPoints };
+    })
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
 
   if (!ranked.length) {
@@ -1050,7 +1150,10 @@ function renderRanking() {
       (user, index) => `
         <div class="ranking-item">
           <span class="ranking-position">${index + 1}</span>
-          <strong>${user.name}</strong>
+          <div class="ranking-name">
+            <strong>${user.name}</strong>
+            <small>1ª fase: ${user.groupPoints} pts · Mata-mata: ${user.knockoutPoints} pts</small>
+          </div>
           <span>${user.points} pts</span>
         </div>
       `,
@@ -1079,6 +1182,7 @@ function renderApp() {
   renderPredictionGroups();
   renderKnockoutSimulation();
   renderOfficialGroups();
+  renderOfficialKnockoutSimulation();
   renderPointBreakdown();
   renderParticipants();
   renderUserHistory();
@@ -1143,6 +1247,19 @@ knockoutBracket.addEventListener("click", (event) => {
   };
   saveState();
   renderKnockoutSimulation();
+});
+officialKnockoutBracket.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-knockout-match]");
+  const user = getCurrentUser();
+  if (!button || !user || !isAdmin(user) || button.disabled) return;
+  const winnerName = button.dataset.winner;
+  if (!winnerName) return;
+  state.officialResults.knockout = {
+    ...(state.officialResults.knockout || {}),
+    [button.dataset.knockoutMatch]: winnerName,
+  };
+  saveState();
+  renderOfficialKnockoutSimulation();
 });
 document.querySelector("#logoutBtn").addEventListener("click", handleLogout);
 document.querySelectorAll(".tab-button").forEach((button) => {

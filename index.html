@@ -119,7 +119,7 @@
           <div class="panel-intro">
             <div>
               <h3>Simulação do mata-mata</h3>
-              <p>A chave usa os 48 jogos da fase de grupos, com desempate por confronto direto, saldo de gols e gols marcados.</p>
+              <p>A chave usa os resultados oficiais da fase de grupos, com desempate por confronto direto, saldo de gols e gols marcados.</p>
             </div>
             <button id="saveKnockoutBtn" class="primary-action" type="button" onclick="saveKnockoutSimulation()">Salvar mata-mata</button>
           </div>
@@ -140,6 +140,13 @@
                 </div>
               </div>
               <div id="officialGroups" class="official-stack"></div>
+              <section class="official-knockout-section">
+                <div>
+                  <h3>Resultados oficiais do mata-mata</h3>
+                  <p>Selecione o vencedor oficial de cada confronto. Cada acerto do participante vale 4 pontos.</p>
+                </div>
+                <div id="officialKnockoutBracket" class="bracket-board"></div>
+              </section>
             </section>
 
             <aside class="ranking-column">
@@ -157,6 +164,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=7"></script>
+    <script src="./app.js?v=8"></script>
   </body>
 </html>
