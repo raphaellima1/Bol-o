@@ -769,13 +769,13 @@ const roundOf32ThirdGroupMatrix = {
     M80: "J",
   },
   BDEFGIJK: {
-    M79: "E",
-    M85: "G",
+    M79: "F",
+    M85: "J",
     M81: "B",
     M74: "D",
-    M82: "J",
-    M77: "F",
-    M87: "I",
+    M82: "I",
+    M77: "G",
+    M87: "E",
     M80: "K",
   },
   ABDEFGIL: {
