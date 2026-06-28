@@ -737,8 +737,32 @@ const roundOf32ThirdSlots = {
   M87: ["D", "E", "I", "J", "L"],
 };
 
+const roundOf32ThirdGroupMatrix = {
+  BDEFIJKL: {
+    M74: "D",
+    M77: "F",
+    M79: "I",
+    M80: "K",
+    M81: "B",
+    M82: "E",
+    M85: "J",
+    M87: "L",
+  },
+};
+
 function assignThirdPlacedTeams(source) {
   const thirds = bestThirdPlacedTeams(source);
+  const matrixKey = thirds.map((team) => team.groupId).sort().join("");
+  const matrixAssignment = roundOf32ThirdGroupMatrix[matrixKey];
+
+  if (matrixAssignment) {
+    return Object.fromEntries(
+      Object.entries(matrixAssignment)
+        .map(([matchId, groupId]) => [matchId, thirds.find((team) => team.groupId === groupId)])
+        .filter(([, team]) => Boolean(team)),
+    );
+  }
+
   const slots = Object.entries(roundOf32ThirdSlots)
     .map(([matchId, eligibleGroups]) => ({
       matchId,
